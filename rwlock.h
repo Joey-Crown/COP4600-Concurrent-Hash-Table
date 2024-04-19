@@ -9,6 +9,8 @@ typedef struct _rwlock_t {
     sem_t writelock;
     sem_t lock;
     int readers;
+    int acq_count;
+    int rel_count;
 } rwlock_t;
 
 void rwlock_init(rwlock_t *lock);
