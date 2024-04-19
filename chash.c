@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
+
 #include <string.h>
 #include "hashdb.h"
 #include "rwlock.h"
@@ -108,6 +109,7 @@ void *print(void *ptr) {
 int main(int argc, char *argv[]) 
 {
     FILE *fp = fopen("commands.txt", "r");
+    FILE *output = fopen("output.txt", "w");
     char cmd_buff[LINEMAX];
     char *token;
     char *name;
@@ -179,7 +181,17 @@ int main(int argc, char *argv[])
     for (int i = 0; i < num_threads; i++) {
         pthread_join(th[i], NULL);
     }
-
+    
     free(th);
+    
+	// close file
+    fclose(fp);
+    fclose(output);
+    if (fp != NULL || output != NULL) 
+    {
+        perror("commands.txt still open - mem leak occurrance");
+        return (-1);
+    }
+    
     return 0;
 }
