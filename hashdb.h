@@ -15,9 +15,10 @@ typedef struct hash_struct
 } hashRecord;
 
 uint32_t jenkins_one_at_a_time_hash(const uint8_t* key, size_t length);
-hashRecord* get_record(uint32_t hash, const char* name, uint32_t salary);
-void insert_record(hashRecord* head, uint32_t hash, const char* name, uint32_t salary);
-void delete_record(hashRecord* head, uint32_t hash);
-hashRecord* search_record(hashRecord* head, uint32_t hash);
+void get_record(hashRecord** new_record, uint32_t hash, const char* name, uint32_t salary);
+void insert_record(hashRecord** head, uint32_t hash, const char* name, uint32_t salary);
+void delete_record(hashRecord** head, uint32_t hash);
+hashRecord* search_record(hashRecord** head, uint32_t hash);
+void free_table(hashRecord* head);
 
 #endif

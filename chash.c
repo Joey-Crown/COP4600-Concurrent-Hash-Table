@@ -28,25 +28,26 @@ static const char *COMMAND_TYPE[5] = {
 rwlock_t mutex;
 
 typedef struct thread_args_struct {
-    hashRecord* head;
+    hashRecord** head;
     char name[50];
     uint32_t salary;
+    FILE *out;
 } thread_args;
 
-void printRecord(hashRecord *rec) {
-    printf("%u,%s,%u\n", rec->hash, rec->name, rec->salary);
+void printRecord(hashRecord *rec, FILE* out) {
+    fprintf(out,"%u,%s,%u\n", rec->hash, rec->name, rec->salary);
 }
 
 void *insert(void *ptr) {
     thread_args *args = (thread_args*)ptr;
     uint32_t hash = jenkins_one_at_a_time_hash((uint8_t*)args->name, strlen(args->name));
-    printf("INSERT,%u,%s,%u\n", hash, (char*) args->name, (uint32_t)args->salary);
+    fprintf(args->out,"INSERT,%u,%s,%u\n", hash, (char*) args->name, (uint32_t)args->salary);
 
     rwlock_acquire_writelock(&mutex);
-    printf("WRITE LOCK ACQUIRED\n");
+    fprintf(args->out,"WRITE LOCK ACQUIRED\n");
     insert_record(args->head, hash, args->name, args->salary);
     rwlock_release_writelock(&mutex);
-    printf("WRITE LOCK RELEASED\n");
+    fprintf(args->out,"WRITE LOCK RELEASED\n");
 
     free(args);
     return NULL;
@@ -55,13 +56,14 @@ void *insert(void *ptr) {
 void *delete(void *ptr) {
     thread_args *args = (thread_args*)ptr;
     uint32_t hash = jenkins_one_at_a_time_hash((uint8_t*)args->name, strlen(args->name));
-    printf("DELETE,%s\n",args->name);
+    fprintf(args->out,"DELETE,%s\n",args->name);
 
     rwlock_acquire_writelock(&mutex);
-    printf("WRITE LOCK ACQUIRED\n");
+    fprintf(args->out,"WRITE LOCK ACQUIRED\n");
     delete_record(args->head, hash);
     rwlock_release_writelock(&mutex);
-    printf("WRITE LOCK RELEASED\n");
+    fprintf(args->out,"WRITE LOCK RELEASED\n");
+
     free(args);
     return NULL;
 }
@@ -69,18 +71,18 @@ void *delete(void *ptr) {
 void *search(void *ptr) {
     thread_args *args = (thread_args*)ptr;
     uint32_t hash = jenkins_one_at_a_time_hash((uint8_t*)args->name, strlen(args->name));
-    printf("SEARCH,%s\n", args->name);
+    fprintf(args->out,"SEARCH,%s\n", args->name);
 
     rwlock_acquire_readlock(&mutex);
-    printf("READ LOCK ACQUIRED\n");
+    fprintf(args->out,"READ LOCK ACQUIRED\n");
     hashRecord* found = search_record(args->head, hash);
     rwlock_release_readlock(&mutex);
-    printf("READ LOCK RELEASED\n");
+    fprintf(args->out,"READ LOCK RELEASED\n");
 
     if (found == NULL) {
-        printf("No Record Found\n");
+        fprintf(args->out,"No Record Found\n");
     } else {
-        printf("%u,%s,%u\n", found->hash, found->name, found->salary);
+        fprintf(args->out,"%u,%s,%u\n", found->hash, found->name, found->salary);
     }
 
     free(args);
@@ -89,17 +91,17 @@ void *search(void *ptr) {
 
 void *print(void *ptr) {
     thread_args *args = (thread_args*)ptr;
-    hashRecord *temp = args->head;
+    hashRecord *temp = *(args->head);
 
     rwlock_acquire_readlock(&mutex);
-    printf("READ LOCK ACQUIRED\n");
+    fprintf(args->out,"READ LOCK ACQUIRED\n");
     // TODO NEEDS TO PRINT IN SORTED ORDER
     while (temp != NULL) {
-        printRecord(temp);
+        printRecord(temp, args->out);
         temp = temp->next;
     }
     rwlock_release_readlock(&mutex);
-    printf("READ LOCK RELEASED\n");
+    fprintf(args->out,"READ LOCK RELEASED\n");
 
     free(args);
     return NULL;
@@ -136,12 +138,12 @@ int main(int argc, char *argv[])
 
         token = strtok(NULL, delim);
         num_threads = atoi(token);
-        printf("Number of threads: %d\n", num_threads);
+        fprintf(output,"Running %d threads\n", num_threads);
     }
 
     rwlock_init(&mutex);
 
-    hashRecord* table = (hashRecord*)malloc(sizeof(hashRecord));
+    hashRecord** table = (hashRecord**)malloc(sizeof(hashRecord*));
     pthread_t *th = (pthread_t*)malloc(sizeof(pthread_t)*num_threads);
     for (size_t i = 0; i < num_threads; i++)
     {
@@ -157,6 +159,7 @@ int main(int argc, char *argv[])
         th_args->head = table;
         strcpy(th_args->name, name);
         th_args->salary = salary;
+        th_args->out = output;
         if (strcmp(token, COMMAND_TYPE[INSERT]) == 0)
         {
             pthread_create(&th[i], NULL, insert, (void*)th_args);
@@ -181,13 +184,21 @@ int main(int argc, char *argv[])
     for (int i = 0; i < num_threads; i++) {
         pthread_join(th[i], NULL);
     }
-    
+
+    fprintf(output,"Number of lock acquisitions: %d\n", mutex.acq_count);
+    fprintf(output,"Number of lock releases: %d\n", mutex.rel_count);
+
+    // Program shutdown
+    hashRecord *temp = *table;
+    while (temp != NULL) {
+        printRecord(temp, output);
+        temp = temp->next;
+    }
+
+    free_table(*table);
+    free(table);
     free(th);
-    
-	// close file
-    fclose(fp);
-    fclose(output);
-    if (fp != NULL || output != NULL) 
+	if (fclose(fp) || fclose(output))
     {
         perror("commands.txt still open - mem leak occurrance");
         return (-1);

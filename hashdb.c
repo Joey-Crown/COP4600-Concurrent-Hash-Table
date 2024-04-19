@@ -16,67 +16,79 @@ uint32_t jenkins_one_at_a_time_hash(const uint8_t* key, size_t length)
     return hash;
 }
 
-hashRecord* get_record(uint32_t hash, const char* name, uint32_t salary) {
-    hashRecord *new_record = (hashRecord*)malloc(sizeof(hashRecord));
-    new_record->hash = hash;
-    strcpy(new_record->name, name);
-    new_record->salary = salary;
-    new_record->next = NULL;
-    return new_record;
+void get_record(hashRecord** new_record, uint32_t hash, const char* name, uint32_t salary) {
+    *new_record = (hashRecord*) malloc(sizeof(hashRecord));
+    (*new_record)->hash = hash;
+    strcpy((*new_record)->name, name);
+    (*new_record)->salary = salary;
+    (*new_record)->next = NULL;
 }
 
-void insert_record(hashRecord* head, uint32_t hash, const char* name, uint32_t salary) 
+void insert_record(hashRecord** head, uint32_t hash, const char* name, uint32_t salary)
 {
-    hashRecord *temp = head;
-
-    if (temp == NULL) {
-        temp = get_record(hash, name, salary);
+    if (*head == NULL)
+    {
+        get_record(head, hash, name, salary);
         return;
     }
 
+    // Inserting as new root
+    if ((*head)->hash > hash)
+    {
+        printf("how many time this happens\n");
+        hashRecord **new_head = (hashRecord**)malloc(sizeof(hashRecord*));
+        get_record(new_head, hash, name, salary);
+        (*new_head)->next = *head;
+        *head = *new_head;
+        free (new_head);
+        return;
+    }
+    hashRecord *temp = *head;
+    hashRecord *prev = *head;
     // Traverse and update existing node if it exists
-    while (temp->next != NULL) {
-        if (temp->hash == hash) {
+    while (temp != NULL && temp->hash <= hash) {
+        if (temp->hash == hash)
+        {
             temp->salary = salary;
-            return;
-        }
-        temp = temp->next;
-    }
-
-    // Check last node in list and update or insert
-    if (temp->hash == hash) {
-        temp->salary = salary;
-    } else {
-        temp->next = get_record(hash, name, salary);
-    }
-
-    return;
-}
-
-void delete_record(hashRecord* head, uint32_t hash)
-{
-    hashRecord *temp = head;
-    hashRecord *prev = NULL;
-    if (temp->hash == hash) {
-        head = temp->next;
-        free(temp);
-        return;
-    }
-
-    while(temp != NULL) {
-        if (temp->hash == hash) {
-            prev->next = temp->next;
-            free(temp);
             return;
         }
         prev = temp;
         temp = temp->next;
     }
+
+    get_record(&prev->next, hash, name, salary);
+    prev->next->next = temp;
+
+    return;
 }
 
-hashRecord* search_record(hashRecord* head, uint32_t hash)
+void delete_record(hashRecord** head, uint32_t hash)
 {
-    hashRecord *temp = head;
+    hashRecord *temp;
+    if ((*head)->hash == hash) {
+        temp = *head;
+        *head = (*head)->next;
+        free(temp);
+    } else {
+        hashRecord *current = *head;
+        while(current->next != NULL) {
+            if (current->next->hash == hash) {
+                temp  = current->next;
+                current->next = current->next->next;
+                free(temp);
+                break;
+            } else {
+                current = current->next;
+            }
+        }
+    }
+
+
+}
+
+hashRecord* search_record(hashRecord** head, uint32_t hash)
+{
+    hashRecord *temp = *head;
     while (temp != NULL) {
         if (temp->hash == hash) {
             return temp;
@@ -84,4 +96,13 @@ hashRecord* search_record(hashRecord* head, uint32_t hash)
         temp = temp->next;
     }
     return NULL;
+}
+
+void free_table(hashRecord* head) {
+    hashRecord *temp = head;
+    while (temp != NULL) {
+        head = temp;
+        temp = temp->next;
+        free(head);
+    }
 }

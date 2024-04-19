@@ -9,6 +9,7 @@ _OBJ = chash.o hashdb.o rwlock.o
 OBJ = $(patsubst %,$(ODIR)/%,$(_OBJ))
 
 $(ODIR)/%.o: %.c $(DEPS)
+	@mkdir -p $(@D)
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 chash: $(OBJ)
