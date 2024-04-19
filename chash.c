@@ -95,7 +95,6 @@ void *print(void *ptr) {
 
     rwlock_acquire_readlock(&mutex);
     fprintf(args->out,"READ LOCK ACQUIRED\n");
-    // TODO NEEDS TO PRINT IN SORTED ORDER
     while (temp != NULL) {
         printRecord(temp, args->out);
         temp = temp->next;
